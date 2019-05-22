@@ -18,9 +18,9 @@ raw_data = pd.read_csv('kospi_data.csv',index_col='Date',parse_dates=True)
 raw_data.sort_index(inplace=True)
 
 def _isBull(data):
-    ## 주가가 12주 이동평균선을 상향 교차하면 상승장이다
-    ## 주가가 12주 이동평균선을 하향 교차하면 하락장이다
-    ## 주가가 12주 이동평균선을 한 방향으로 교차한 지 10봉 이내에 반대 방향으로 교차하면 횡보장이다
+    ## 주가가 7주 이동평균선을 상향 교차하면 상승장이다
+    ## 주가가 7주 이동평균선을 하향 교차하면 하락장이다
+    ## 주가가 7주 이동평균선을 한 방향으로 교차한 지 10봉 이내에 반대 방향으로 교차하면 횡보장이다
 
     ## set price variables
 
@@ -43,9 +43,9 @@ def _isBull(data):
     return cross_date
 
 def _isBear(data):
-    ## 주가가 12주 이동평균선을 상향 교차하면 상승장이다
-    ## 주가가 12주 이동평균선을 하향 교차하면 하락장이다
-    ## 주가가 12주 이동평균선을 한 방향으로 교차한 지 10봉 이내에 반대 방향으로 교차하면 횡보장이다
+    ## 주가가 7주 이동평균선을 상향 교차하면 상승장이다
+    ## 주가가 7주 이동평균선을 하향 교차하면 하락장이다
+    ## 주가가 7주 이동평균선을 한 방향으로 교차한 지 10봉 이내에 반대 방향으로 교차하면 횡보장이다
 
     ## set price variables
 
@@ -114,42 +114,37 @@ def cleansing(bull_date,bear_date):
 
     return bull_date_list, bear_date_list
 
+def profit_cal(data,other_data,dates,other_dates,key = 1):
+    profit_list = []
+    kospi_list = []
+    for i in range(0,min(len(dates),len(other_dates))):
+        start_price = float(data[data.index == dates[i]].MA)
+        end_price = float(other_data[other_data.index > dates[i]].MA[0])
+
+        if key == 1:
+            profit = (end_price / start_price) - 1 -0.02 #### 실질적으로 MA 돌파시에 바로 포지션을 바꿀 수 없기 때문에 2% 손해 가정
+        elif key == -1:
+            profit = (start_price / end_price) -1  -0.02 #### 실질적으로 MA 돌파시에 바로 포지션을 바꿀 수 없기 때문에 2% 손해 가정
+
+        profit_list = profit_list + [profit]
+        kospi_list = kospi_list + [data.Close[i]]
+
+    df = {'Kospi': kospi_list, 'profit': profit_list}
+    df = pd.DataFrame(df, index=dates[0:min(len(dates),len(other_dates))])
+
+    return df
+
+
+
+##### 함수영역 끝 ########################################################
 
 
 bull_dates, bear_dates = cleansing(bull_date,bear_date)
-
-for i in range(0,len(bull_dates)):
-    start_price = float(bull_date[bull_date.index == bull_dates[i]].Close)
-    end_price = float(bear_date[bear_date.index>bull_dates[i]].Close[0])
-
-    profit = (end_price/start_price)-1
+df1 = profit_cal(bull_date,bear_date,bull_dates,bear_dates,1)
+df2 = profit_cal(bear_date,bull_date,bear_dates,bull_dates,-1)
 
 
-    tr_profit = tr_profit*(1+profit)
-
-    profit_list = profit_list+[profit]
-    kospi_list = kospi_list + [bull_date.Close[i]]
-
-df = {'Kospi':kospi_list,'profit':profit_list}
-df = pd.DataFrame(df,index=bull_dates)
-
-
-for i in range(0,len(bear_dates)):
-    start_price = float(bear_date[bear_date.index == bear_dates[i]].Close)
-    end_price = float(bull_date[bull_date.index>bear_dates[i]].Close[0])
-
-    profit = (start_price/end_price)-1
-    # tr_profit2 = tr_profit2*(1+profit)
-
-    profit_list2 = profit_list2+[profit]
-    kospi_list2 = kospi_list2 + [bear_date.Close[i]]
-
-
-
-df2 = {'Kospi':kospi_list2,'profit':profit_list2}
-df2 = pd.DataFrame(df2,index=bear_dates)
-
-df_mer = pd.merge(df.profit,df2.profit,how='outer',left_index=True,right_index=True)
+df_mer = pd.merge(df1.profit,df2.profit,how='outer',left_index=True,right_index=True)
 df_mer.to_csv('kospi_strategy.csv')
 df_mer.fillna(0,inplace=True)
 
@@ -173,8 +168,9 @@ df_profit = {'Profit':profit_tr_list,'KOSPI':kospi_list}
 df_profit = pd.DataFrame(df_profit)
 df_profit.index = df_mer.index
 
-print("MDD = ",df_mer.min())
-print("Mean = ",df_mer.mean())
+print("MDD = ",round(df_mer.min()*100,2),"%")
+print("Mean = ",round(df_mer.mean()*100,2),"%")
+print("Hit Rataio = ",round(len(df_mer[df_mer>0])/len(df_mer),2))
 ax = df_mer.plot()
 ax.axhline(y=0)
 # df_mer.plot.hist(bins=50)
