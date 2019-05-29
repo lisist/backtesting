@@ -38,9 +38,11 @@ def data_merge(data, window=7):
     return data_merged
 
 
-def charting(df1,data,profit_list,window,holding_peirod):
+def charting(df1,data,profit_list,window,holding_period):
+    print("Number of Opportunities = ",len(profit_list))
+    # print("Number of False signal",(profit_list))
     print("MA weeks = ", window)
-    print("hodling period =", a.holding_period, "months")
+    print("hodling period =", holding_period, "months")
     print("Total Return = ", df1.profit[-1])
     print("Benchmark Return = ", df1.Kospi[-1])
     print("MDD  = ", round(min(a.profit()) * 100, 2), "%")
@@ -75,7 +77,7 @@ class Strategy:
     def __init__(self,data,holding_period=3, cost=0.05, key=1):
         self.data = data
         self.key = key  ## if key == 1 : bull market signal, if key == -1 : bear markey signal
-        self.holding_period = holding_peirod
+        self.holding_period = holding_period
         self.cost = cost
         self.location = []
 
@@ -86,12 +88,12 @@ class Strategy:
         if self.key == 1:
             for i in range(0,len(data.index)):
                 if data.Close[i]-data.Open[i] > (data.High[i]-data.Low[i])*0.5:
-                    if  data.MA[i] > data.Open[i] and data.MA[i] < data.Close[i]:
+                    if  data.MA[i] > data.Low[i] and data.MA[i] < data.Close[i]:
                         data_pilar = data_pilar + [data.index[i]]
         if self.key == -1:
             for i in range(0,len(data.index)):
                 if data.Open[i]-data.Close[i] > (data.High[i]-data.Low[i])*0.5:
-                    if  data.MA[i] < data.Open[i] and data.MA[i] > data.Close[i]:
+                    if  data.MA[i] < data.High[i] and data.MA[i] > data.Close[i]:
                         data_pilar = data_pilar + [data.index[i]]
 
         return data_pilar
@@ -157,7 +159,7 @@ class Strategy:
                         reach_leastResistance = True
 
                 if reach_leastResistance is False:
-                    profit = ((self.data.iloc[self.location[i] + time_frame - 1].Close * (1 - cost)) / (
+                    profit = ((self.data.iloc[self.location[i] + time_frame - 1].Close ) / (
                                 self.data.iloc[self.location[i] - 1].MA * (1 + self.cost)) - 1)
                     profit_list[i] = float(profit)
 
@@ -166,14 +168,14 @@ class Strategy:
                 for j in range(0, time_frame):
                     self.location[i] = len(self.data[self.data.index <= pilar_date[i]].index)
                     if self.data.iloc[self.location[i] + j].High > lr_data[i]:
-                        profit = -((lr_data[i] * (1 - self.cost)) / (
-                                self.data[self.data.index == pilar_date[i]].MA * (1 + self.cost + 0.005)) - 1)
+                        profit = -((lr_data[i] * (1 + self.cost)) / (
+                                self.data[self.data.index == pilar_date[i]].MA * (1 - self.cost - 0.005)) - 1)
                         profit_list[i] = float(profit)
                         reach_leastResistance = True
 
                 if reach_leastResistance is False:
-                    profit = -((self.data.iloc[self.location[i] + time_frame - 1].Close * (1 - cost)) / (
-                                self.data.iloc[self.location[i] - 1].MA * (1 + self.cost)) - 1)
+                    profit = -((self.data.iloc[self.location[i] + time_frame - 1].Close ) / (
+                                self.data.iloc[self.location[i] - 1].MA * (1 - self.cost)) - 1)
                     profit_list[i] = float(profit)
 
 
@@ -233,16 +235,25 @@ class Strategy:
 
 
 if __name__ == '__main__':
-    raw_data = pd.read_csv('kospi_data.csv', index_col='Date', parse_dates=True)
+    raw_data = pd.read_csv('shcomp_data.csv', index_col='Date', parse_dates=True)
     raw_data.sort_index(inplace=True)
 
     window = 7  ## MA 계산할 주기 기본 7주
-    holding_peirod = 3
+    holding_period = 3
     cost = 0.005
 
     data = data_merge(raw_data)
-    a = Strategy(data,holding_peirod,cost,1)
+    data = data[data.index>data.index[-500]]
+
+    a = Strategy(data,holding_period,cost,key=-1)
+    b = Strategy(data,holding_period=1,cost=0.005,key =-1)
 
     profit_list = np.array(a.profit())
     df1 = a.total_profit()
     charting(df1,data,profit_list,window,a.holding_period)
+
+    profit_list2 = np.array(b.profit())
+    df2 = b.total_profit()
+    charting(df2,data,profit_list2,window,b.holding_period)
+
+    
