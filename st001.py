@@ -12,6 +12,8 @@
 ## 청산 전략 : 시장이 장대 음봉 돌파 순간의 최고점을 '최저 저항선'으로 지정하고 가격이 최저 저항선 위로 올라가지 않는 상황에서는
 ##              Holding period간 보유
 
+
+## 향후 보완점 : False signal 발생 이후 청산할 때 수익률을 -1% 일괄 적용했지만 실제로는 청산하는 주의 Close price를 이용하여 계산해야 할 듯
 #####################################################################################################
 
 import pandas as pd
@@ -139,6 +141,7 @@ class Strategy:
         pilar_date = self.pilar()
         lr_data = self.least_resistance()
         false_date = self.searchFalseSignal()
+        print(pilar_date)
 
         profit_list = np.repeat(0.0, len(pilar_date))
         time_frame = 4 * self.holding_period  ### short의 경우 Long보다 짧게
@@ -160,7 +163,7 @@ class Strategy:
 
                 if reach_leastResistance is False:
                     profit = ((self.data.iloc[self.location[i] + time_frame - 1].Close ) / (
-                                self.data.iloc[self.location[i] - 1].MA * (1 + self.cost)) - 1)
+                                self.data.iloc[self.location[i] - 1].MA * (1 + self.cost+0.005)) - 1)
                     profit_list[i] = float(profit)
 
             if self.key == -1:
@@ -175,7 +178,7 @@ class Strategy:
 
                 if reach_leastResistance is False:
                     profit = -((self.data.iloc[self.location[i] + time_frame - 1].Close ) / (
-                                self.data.iloc[self.location[i] - 1].MA * (1 - self.cost)) - 1)
+                                self.data.iloc[self.location[i] - 1].MA * (1 - self.cost-0.005)) - 1)
                     profit_list[i] = float(profit)
 
 
@@ -235,7 +238,7 @@ class Strategy:
 
 
 if __name__ == '__main__':
-    raw_data = pd.read_csv('shcomp_data.csv', index_col='Date', parse_dates=True)
+    raw_data = pd.read_csv('kospi_data.csv', index_col='Date', parse_dates=True)
     raw_data.sort_index(inplace=True)
 
     window = 7  ## MA 계산할 주기 기본 7주
@@ -243,9 +246,9 @@ if __name__ == '__main__':
     cost = 0.005
 
     data = data_merge(raw_data)
-    data = data[data.index>data.index[-500]]
+    data = data[data.index>data.index[-200]]
 
-    a = Strategy(data,holding_period,cost,key=-1)
+    a = Strategy(data,holding_period,cost,key=1)
     b = Strategy(data,holding_period=1,cost=0.005,key =-1)
 
     profit_list = np.array(a.profit())
@@ -255,5 +258,3 @@ if __name__ == '__main__':
     profit_list2 = np.array(b.profit())
     df2 = b.total_profit()
     charting(df2,data,profit_list2,window,b.holding_period)
-
-    
