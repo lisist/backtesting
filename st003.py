@@ -20,7 +20,7 @@ class Strategy3:
     def __init__(self,data):
         self.data = data
 
-    def calCorrel(self):
+    def calCorrel(self):    ### 128일 이전 Correlation을 계산합니다
         data = self.data
         target_data = data['SPX'][-128:]
 
@@ -37,36 +37,37 @@ class Strategy3:
 
         return df
 
-    def signalDates(self):
+    def signalDates(self):   ### Correaltion이 가장 높은 5개 시기의 시작 일자를 뽑습니다.
         data = self.data
         df = self.calCorrel()
         df_test = df.sort_values(by=['cor'], ascending=False)
 
         signal_date_list = []
 
-        for i in range(0,5):
+        for i in range(0,1):
             signal_date = df_test.iloc[0].date
             df_test = df_test.drop(df_test[abs((df_test['date'] - signal_date).dt.days) < 128].index, axis=0)
             signal_date_list = signal_date_list + [signal_date]
 
         return signal_date_list
 
-    def decideLongShort(self):
+    def decideLongShort(self):   ### Long할지 여부를 결정합니다. Correlation이 높은 5개 시기의 향후 3개월간 수익률이 hurdle_rate 수준 이상이면 Long
         data = self.data
         dates = self.signalDates()
+        hurdle_return = 0.03
 
         profit_list = []
 
-        for i in range(0,5):
+        for i in range(0,1):
             current_price = data[data.index == dates[i]].values[0]
-            future_price = data[(data.index - dates[i]).days < 90].values[-1]
+            future_price = data[(data.index - dates[i]).days < 30].values[-1]
 
             profit = float(future_price / current_price - 1)
             profit_list = profit_list + [profit]
 
         average_return = np.mean(np.array(profit_list))
 
-        if average_return > 0.1:
+        if average_return > hurdle_return:
             return 1
         else:
             return 0
@@ -75,13 +76,29 @@ class Strategy3:
 if __name__=='__main__':
 
     data = pd.read_csv('spx_all_time.csv', index_col='date', parse_dates=True)
-    monthly_data = pd.read_csv('spx_monthly',index_col='date',parse_dates=True)
+    monthly_data = pd.read_csv('spx_monthly.csv', index_col='date',parse_dates=True)
     data.sort_index(inplace=True)
     monthly_data.sort_index(inplace=True)
 
-    for i in range(0,2000):
-        data_selected = data[:-2000+i]
-        a = Strategy3(data_selected)
+    # print(monthly_data.index[0])
+    a_list = []
+    threeMReturn_list = []
+    dates = []
 
-        print(data_selected.index[-1])
-        print(a.decideLongShort())
+    for i in range(0,len(monthly_data.index)-5):
+        data_selected = data[data.index <= monthly_data.index[i]]
+        dates = dates + [monthly_data.index[i]]
+        a = Strategy3(data_selected)
+        # print(monthly_data.iloc[i])
+        # print(monthly_data.iloc[i+3].Spx / monthly_data.iloc[i].Spx - 1)
+
+        a_list = a_list + [a.decideLongShort()]
+        threeMReturn_list = threeMReturn_list +  [monthly_data.iloc[i+1].Spx / monthly_data.iloc[i].Spx - 1]
+
+        print(monthly_data.index[i])
+        print(a_list[-1])
+        print(threeMReturn_list[-1])
+
+        df = {'Date': dates, 'Signal': a_list, 'Return': threeMReturn_list}
+        df = pd.DataFrame(df)
+        df.to_csv('result.csv')
