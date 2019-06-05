@@ -20,8 +20,14 @@ class Strategy3:
     def __init__(self,data):
         self.data = data
 
-    def calCorrel(self):    ### 128일 이전 Correlation을 계산합니다
+    def daily_return(self):
         data = self.data
+        d_return = data / data.shift(1) - 1
+
+        return d_return[1:]
+
+    def calCorrel(self):    ### 128일 이전 Correlation을 계산합니다
+        data = self.daily_return()
         target_data = data['SPX'][-128:]
 
         le = len(data)
@@ -30,7 +36,7 @@ class Strategy3:
         for i in range(0, le-256):
             com_data = data['SPX'][i:i + 128]
             cor_list = cor_list + [np.corrcoef(target_data.values, com_data.values)[1, 0]]
-            date_list = date_list + [data.index[i]]
+            date_list = date_list + [data.index[i+127]]
 
         df = {'date':date_list,'cor':cor_list}
         df = pd.DataFrame(df)
@@ -38,13 +44,13 @@ class Strategy3:
         return df
 
     def signalDates(self):   ### Correaltion이 가장 높은 5개 시기의 시작 일자를 뽑습니다.
-        data = self.data
+        # data = self.data
         df = self.calCorrel()
         df_test = df.sort_values(by=['cor'], ascending=False)
 
         signal_date_list = []
 
-        for i in range(0,1):
+        for i in range(0,10):
             signal_date = df_test.iloc[0].date
             df_test = df_test.drop(df_test[abs((df_test['date'] - signal_date).dt.days) < 128].index, axis=0)
             signal_date_list = signal_date_list + [signal_date]
@@ -58,16 +64,23 @@ class Strategy3:
 
         profit_list = []
 
-        for i in range(0,1):
+        for i in range(0,2):
             current_price = data[data.index == dates[i]].values[0]
-            future_price = data[(data.index - dates[i]).days < 30].values[-1]
+            future_price = data[(data.index - dates[i]).days < 31].values[-1]
 
             profit = float(future_price / current_price - 1)
             profit_list = profit_list + [profit]
 
         average_return = np.mean(np.array(profit_list))
 
-        if average_return > hurdle_return:
+        # if average_return > hurdle_return:
+        #     return 1
+        # else:
+        #     return 0
+
+        # if sum([x < 0 for x in profit_list]) >= 7:
+        #     return 1
+        if average_return < -hurdle_return:
             return 1
         else:
             return 0
@@ -76,24 +89,22 @@ class Strategy3:
 if __name__=='__main__':
 
     data = pd.read_csv('spx_all_time.csv', index_col='date', parse_dates=True)
-    monthly_data = pd.read_csv('spx_monthly.csv', index_col='date',parse_dates=True)
-    data.sort_index(inplace=True)
-    monthly_data.sort_index(inplace=True)
 
-    # print(monthly_data.index[0])
+    monthly_data = data.resample('M').last()  ## 월별 데이터로 정리
+    monthly_data = monthly_data[-230:]
+
     a_list = []
     threeMReturn_list = []
     dates = []
+
 
     for i in range(0,len(monthly_data.index)-5):
         data_selected = data[data.index <= monthly_data.index[i]]
         dates = dates + [monthly_data.index[i]]
         a = Strategy3(data_selected)
-        # print(monthly_data.iloc[i])
-        # print(monthly_data.iloc[i+3].Spx / monthly_data.iloc[i].Spx - 1)
 
         a_list = a_list + [a.decideLongShort()]
-        threeMReturn_list = threeMReturn_list +  [monthly_data.iloc[i+1].Spx / monthly_data.iloc[i].Spx - 1]
+        threeMReturn_list = threeMReturn_list +  [monthly_data.iloc[i+1].SPX / monthly_data.iloc[i].SPX - 1]
 
         print(monthly_data.index[i])
         print(a_list[-1])
