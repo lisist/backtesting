@@ -6,39 +6,45 @@ import numpy as np
 data = pd.read_csv('kospi_data.csv', index_col='Date', parse_dates=True)
 data = data.sort_index()
 
-for i in range(0,len(data.index)-26,13):
-    a = pp.pickPoint(data[i:i+26], 3)
+
+
+
+for i in range(0,len(data.index)-26):
+    data_selected = data[i:i+26]
+
+    a = pp.pickPoint(data_selected, 3)
+
     peak_index = a.selectPeak()
     bottom_index = a.selectBottom()
 
     peak_date = data[i:i+26].index[peak_index]
-    peak_price = data[i:i+26].Close.values[peak_index]
+    peak_price = data[i:i+26].High.values[peak_index]
 
     bottom_date = data[i:i+26].index[bottom_index]
-    bottom_price = data[i:i+26].Close.values[bottom_index]
+    bottom_price = data[i:i+26].Low.values[bottom_index]
 
-    for j in range(0,len(peak_index)-1):
-        if i > 52:
-            maximum = np.max(data[i+peak_index[j] - 52:i+peak_index[j]].High)
-            if peak_price[j] >= maximum:
-                print(peak_date[j],peak_price[j])
-                next_bottom_date = bottom_date[bottom_date > peak_date[j]][0]
-                next_bottom_price = bottom_price[bottom_date>peak_date[j]][0]
-
-                if peak_price[j] > next_bottom_price and peak_price[j+1] > peak_price[j]:
-                    print(peak_date[j+1],peak_price[j+1])
-
-                    # print(data[data.index > peak_date[j] & data.index < data[i+26].index].Close > peak_price[j])
+    peak_price = peak_price.tolist()
+    max_price = np.max(peak_price)
 
 
+    if data_selected.High[-1] >= max_price and len(peak_date) > 0:
+        max_peak_date = peak_date[peak_price.index(max_price)]
 
-                    data[i:i + 26].Close.plot()
-                    plt.scatter(x=peak_date[j], y=peak_price[j])
-                    plt.scatter(x=next_bottom_date, y=next_bottom_price)
-                    plt.scatter(x=peak_date[j + 1], y=peak_price[j + 1])
-                    plt.show()
+        selected_bottom_date = bottom_date[bottom_date > max_peak_date]
+        selected_bottom_price = bottom_price[bottom_date > max_peak_date]
+
+        try:
+            if max_price * 0.95 > np.min(selected_bottom_price) and len(selected_bottom_date) > 0:
+                buy_date = data_selected.index[-1]
+                print(buy_date)
 
 
-        else:
+                data_selected.Close.plot()
+                data_selected.High.plot()
+                data_selected.Low.plot()
+                plt.scatter(x=peak_date, y=peak_price)
+                plt.scatter(x=bottom_date, y=bottom_price)
+                plt.show()
+
+        except:
             pass
-
