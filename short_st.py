@@ -40,7 +40,7 @@ class short_and:
 
         return data
 
-    def entry_porint(self):
+    def entry_point(self):
         data = self.average_vol()
 
         data['daily_diff'] = data.Close-data.Close.shift(1)
@@ -48,10 +48,10 @@ class short_and:
 
         return entry_point
 
-    def exit_date(self):
+    def calCul(self):
         data = self.average_vol()
-        entry_point = self.entry_porint()
-        print(entry_point)
+        entry_point = self.entry_point()
+        divider = 5
 
         profit_list =[]
         entry_price_list = []
@@ -63,8 +63,11 @@ class short_and:
             data2 = data[data.index >= i]
             data2 = data2[(data2.index - i).days < 120]
 
-            entry_price = data2.Open[1]     ## entry 신호 이후 바로 다음날 시초가로 진입
-            entry_price_list = entry_price_list + [entry_price]
+            if len(data2.index) > 1:
+                entry_price = data2.Open[1]     ## entry 신호 이후 바로 다음날 시초가로 진입
+                entry_price_list = entry_price_list + [entry_price]
+            else:
+                break
 
             data2['price_chg'] = data2.Low - entry_price
             data2 = data2.iloc[1:]
@@ -84,12 +87,12 @@ class short_and:
 
             exit_price_chg = []
 
-            exit_price_chg.append(data2.ATR[0]/2 + data2.price_chg[0])
+            exit_price_chg.append(data2.ATR[0]/divider + data2.price_chg[0])
 
             for j in range(1,len(data2.index)):
                 exit_price_chg.append(exit_price_chg[j-1])
-                if data2.ATR[j]/2 + data2.price_chg[j] < exit_price_chg[j] :
-                    exit_price_chg[j]=(data2.ATR[j]/2 + data2.price_chg[j])
+                if data2.ATR[j]/divider + data2.price_chg[j] < exit_price_chg[j] :
+                    exit_price_chg[j]=(data2.ATR[j]/divider + data2.price_chg[j])
                 else:
                     pass
 
@@ -111,7 +114,7 @@ class short_and:
         profit_list = -np.array(exit_price_list)/np.array(entry_price_list)
         profit_list = list(np.array(profit_list)-0.003)   ### 수수료 등을 감안하여 평균 0.3% 비용 반영
 
-        print(profit_list)
+        # print(profit_list)
 
         # df = {'date':entry_point,'profit':profit_list}
         # df = pd.DataFrame(df)
@@ -121,19 +124,49 @@ class short_and:
         #
         # plt.hist(profit_list,bins=24)
         # plt.show()
+        return profit_list
 
-        print("hit ratio : ",sum([x>0 for x in profit_list])/len(profit_list))
-        print("expected return : ",np.mean(profit_list))
+
+    def total_stat(self):
+        profit_list = self.calCul()
+
+        if len(profit_list) > 0:
+            hit_ratio = sum([x>0 for x in profit_list])/len(profit_list)
+            expected_return =  np.mean(profit_list)
+
+            return hit_ratio, expected_return
+        else:
+            return np.nan, np.nan
+
 
 
 
 
 if __name__ == '__main__':
     data = pd.read_csv('kospi_daily.csv', index_col='Date', parse_dates=True)
+    key = np.random.randint(0,len(data.index)-1000,50)
 
-    a = short_and(data[:-len(data.index)+300])
-    b = short_and(data[1000:2000])
-    c = short_and(data[2000:3000])
-    a.exit_date()
-    b.exit_date()
-    c.exit_date()
+    hit_ratio_list =[]
+    expected_return_list = []
+
+    for i in key:
+        a = short_and(data[i:i + 1000])
+        # hit_ratio, expected_return =a.total_stat()
+        hit_ratio, expected_return = a.total_stat()
+        print('hit_ratio : ', hit_ratio)
+        print('expected_raturn : ', expected_return)
+
+        hit_ratio_list = hit_ratio_list + [hit_ratio]
+        expected_return_list = expected_return_list + [expected_return]
+
+
+    print(np.nanmean(hit_ratio_list))
+    print(np.nanmean(expected_return_list))
+
+    # a = short_and(data[:-len(data.index)+300])
+    # b = short_and(data[1000:2000])
+    # c = short_and(data[2000:3000])
+    # a.exit_date()
+    # b.exit_date()
+    # c.exit_date()
+
