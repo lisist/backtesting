@@ -3,10 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-
 ### class short_and
-### 지난 몇 일간(예를 들어 4주) 변동성을 넘어 장이 하락할 때
-### 다음날 시가 기준으로 진입.
+### 지난 몇 일간(예를 들어 4주)의 변동성을 넘어 장이 하락할 때
+### 다음날 시가 기준으로 진입
 ### 이후 평균적으로 최대로 얼마까지 빠진 이후 반등하는 지 확인
 
 class short_and:
@@ -49,50 +48,92 @@ class short_and:
 
         return entry_point
 
-    def calcul(self):
+    def exit_date(self):
         data = self.average_vol()
         entry_point = self.entry_porint()
+        print(entry_point)
 
         profit_list =[]
-        entry_point_list = []
+        entry_price_list = []
+        exit_date = []
+        exit_price_list = []
+
         for i in entry_point:
+
             data2 = data[data.index >= i]
             data2 = data2[(data2.index - i).days < 120]
 
-            entry_price = data2.Open[1]
+            entry_price = data2.Open[1]     ## entry 신호 이후 바로 다음날 시초가로 진입
+            entry_price_list = entry_price_list + [entry_price]
+
             data2['price_chg'] = data2.Low - entry_price
-            data2 = data2.iloc[2:]
+            data2 = data2.iloc[1:]
 
             for j in range(0,len(data2.index)):
                 if data2['price_chg'][j] > 0:
-                    data2 = data2.iloc[:j]
-                    # print(data2)
+                    if j <= len(data2.index)-50:
+                        data2 = data2.iloc[:j+50]
+                        break_date = data2.index[j]
+                        break
+                    else:
+                        data2 = data2
+                        break_date = data2.index[j]
+                        break
+
+            ### exit 기준가 산정
+
+            exit_price_chg = []
+
+            exit_price_chg.append(data2.ATR[0]/2 + data2.price_chg[0])
+
+            for j in range(1,len(data2.index)):
+                exit_price_chg.append(exit_price_chg[j-1])
+                if data2.ATR[j]/2 + data2.price_chg[j] < exit_price_chg[j] :
+                    exit_price_chg[j]=(data2.ATR[j]/2 + data2.price_chg[j])
+                else:
+                    pass
+
+                if data2.price_chg[j] > exit_price_chg[j]:
+                    exit_date = exit_date + [data2.index[j]]
+                    exit_price_list = exit_price_list + [exit_price_chg[j]]
                     break
+                elif j == (len(data2.index) - 1):
+                    exit_date = exit_date + [data2.index[j]]
+                    exit_price_list = exit_price_list + [exit_price_chg[j]]
 
-            try :
-                min_chg = np.min(data2['price_chg'])
-                min_profit = min_chg/entry_price
+            if len(data2.index) == 1:
+                exit_date = exit_date + [data2.index[0]]
+                exit_price_list = exit_price_list + [data2.Close[0]-data2.Open[0]]
 
-                profit_list = profit_list + [min_profit]
-                entry_point_list = entry_point_list + [i]
 
-            except:
-                pass
+
+        ### Profit 계산
+        profit_list = -np.array(exit_price_list)/np.array(entry_price_list)
+        profit_list = list(np.array(profit_list)-0.003)   ### 수수료 등을 감안하여 평균 0.3% 비용 반영
 
         print(profit_list)
-        print(np.nansum(profit_list)/len(entry_point))
 
-        df = {'date':entry_point_list,'profit':profit_list}
-        df = pd.DataFrame(df)
-        df.to_csv('short_and_result.csv')
-        plt.bar(x=range(0,len(entry_point)),height=profit_list)
-        plt.show()
+        # df = {'date':entry_point,'profit':profit_list}
+        # df = pd.DataFrame(df)
+        # df.to_csv('short_and_result.csv')
+        # plt.bar(x=range(0,len(entry_point)),height=profit_list)
+        # plt.show()
+        #
+        # plt.hist(profit_list,bins=24)
+        # plt.show()
+
+        print("hit ratio : ",sum([x>0 for x in profit_list])/len(profit_list))
+        print("expected return : ",np.mean(profit_list))
+
+
 
 
 if __name__ == '__main__':
     data = pd.read_csv('kospi_daily.csv', index_col='Date', parse_dates=True)
 
-    # a = short_and(data[:-2500])
-    a = short_and(data)
-    # a.data_filtered()
-    a.calcul()
+    a = short_and(data[:-len(data.index)+300])
+    b = short_and(data[1000:2000])
+    c = short_and(data[2000:3000])
+    a.exit_date()
+    b.exit_date()
+    c.exit_date()
